@@ -1,5 +1,8 @@
 **Sharp Manager Web** is an website port of [SharpManager](https://github.com/codaris/SharpManager) mady by Codaris. It works together with an [Arduino](https://store.arduino.cc/pages/nano-family) to connect the Sharp computer to a USB port on your desktop.  With this hardware and software, Sharp Manager emulates a [CE-126P](http://pocket.free.fr/html/sharp/ce-126p_e.html) cassette and printer interface and a Sharp [CE-140F](http://pocket.free.fr/html/sharp/ce-140f_e.html) floppy drive.
 
+## Quick note
+index.html is an one page file and other files are servable via npx serve
+
 ## Requirements
 
 To use this software you will need the following:
