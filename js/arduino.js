@@ -54,16 +54,20 @@ export class Arduino {
 
   async disconnect() {
     if (!this.isConnected) return;
+    // Null stream and mark disconnected immediately so concurrent code
+    // sees the disconnected state without waiting for the async close.
+    this.isConnected = false;
     this._stopLoop();
     this._opAbort?.abort();
-    try { this._stream?.writeByte(Ascii.CAN); } catch {}
-    this._disk.reset();
-    await this._stream?.close();
+    const stream = this._stream;
+    const port   = this._port;
     this._stream = null;
-    try { await this._port?.close(); } catch {}
-    this._port = null;
-    this.isConnected = false;
+    this._port   = null;
+    this._disk.reset();
     this.onStateChange?.();
+    try { stream?.writeByte(Ascii.CAN); } catch {}
+    await stream?.close();
+    try { await port?.close(); } catch {}
     this._log.writeLine('Disconnected.');
   }
 
@@ -138,7 +142,13 @@ export class Arduino {
       await new Promise(r => setTimeout(r, 100));
       if (!this._stream) throw new ArduinoError('Disconnected during command setup');
       this._stream.clearBuffer();
-      return await fn();
+      try {
+        return await fn();
+      } catch (e) {
+        // Convert null-stream TypeErrors to a clean ArduinoError
+        if (e instanceof TypeError && !this._stream) throw new ArduinoError('Disconnected');
+        throw e;
+      }
     } finally {
       this._cmdActive = false;
       this._resumeLoop?.();
