@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SharpManager Web</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #181825;
+      border-bottom: 1px solid #313244;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 { font-size: 1.1rem; font-weight: 600; color: #cba6f7; }
+
+    #status {
+      margin-left: auto;
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    #status.connected    { background: #a6e3a1; color: #1e1e2e; }
+    #status.disconnected { background: #45475a; color: #cdd6f4; }
+
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────────── */
+    aside {
+      width: 220px;
+      min-width: 220px;
+      background: #181825;
+      border-right: 1px solid #313244;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6c7086;
+      margin-top: 10px;
+      margin-bottom: 2px;
+      padding-left: 4px;
+    }
+
+    button {
+      width: 100%;
+      padding: 7px 12px;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      background: #313244;
+      color: #cdd6f4;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s;
+    }
+    button:hover:not(:disabled) { background: #45475a; }
+    button:disabled { opacity: 0.4; cursor: default; }
+
+    button.primary {
+      background: #7287fd;
+      border-color: #7287fd;
+      color: #1e1e2e;
+      font-weight: 600;
+    }
+    button.primary:hover:not(:disabled) { background: #8899ff; }
+
+    button.danger {
+      background: #f38ba8;
+      border-color: #f38ba8;
+      color: #1e1e2e;
+      font-weight: 600;
+    }
+    button.danger:hover:not(:disabled) { background: #f5a0b5; }
+
+    button.warning {
+      background: #fab387;
+      border-color: #fab387;
+      color: #1e1e2e;
+    }
+    button.warning:hover:not(:disabled) { background: #fcc49a; }
+
+    .disk-info {
+      font-size: 0.75rem;
+      color: #89b4fa;
+      padding: 4px 4px;
+      word-break: break-all;
+      min-height: 1.2em;
+    }
+
+    .debug-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px;
+      font-size: 0.85rem;
+    }
+    .debug-row input[type=checkbox] { accent-color: #cba6f7; cursor: pointer; }
+    .debug-row label { cursor: pointer; }
+
+    /* ── Log panel ────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 12px;
+      gap: 8px;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .log-header span { font-size: 0.8rem; color: #6c7086; }
+
+    #log {
+      flex: 1;
+      background: #11111b;
+      border: 1px solid #313244;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #a6e3a1;
+    }
+
+    #log .debug { color: #6c7086; }
+
+    #btn-clear-log {
+      width: auto;
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      background: #1e1e2e;
+      border-color: #45475a;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>SharpManager Web</h1>
+  <div id="status" class="disconnected">Disconnected</div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="section-label">Connection</div>
+    <button id="btn-connect"    class="primary">Connect Arduino</button>
+    <button id="btn-disconnect" class="danger"  disabled>Disconnect</button>
+    <button id="btn-ping"                       disabled>Ping</button>
+
+    <div class="section-label">Cassette (CE-126P)</div>
+    <button id="btn-send-tape" disabled>Send Tape File…</button>
+    <button id="btn-recv-tape" disabled>Receive Tape File</button>
+
+    <div class="section-label">Disk Drive (CE-140F)</div>
+    <button id="btn-disk-dir"  disabled>Select Disk Folder…</button>
+    <div id="lbl-disk-dir" class="disk-info">No folder selected</div>
+
+    <div class="section-label">Operation</div>
+    <button id="btn-cancel" class="warning" disabled>Cancel</button>
+
+    <div style="flex:1"></div>
+
+    <div class="debug-row">
+      <input type="checkbox" id="chk-debug">
+      <label for="chk-debug">Debug messages</label>
+    </div>
+  </aside>
+
+  <main>
+    <div class="log-header">
+      <span>Output</span>
+      <button id="btn-clear-log">Clear</button>
+    </div>
+    <div id="log"></div>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ─── ascii.js ────────────────────────────────────────────────────────────────
+
+const Ascii = {
+  NUL: 0,
+  SOH: 1,
+  STX: 2,
+  ETX: 3,
+  ACK: 6,
+  DLE: 16,
+  NAK: 21,
+  SYN: 22,
+  CAN: 24,
+};
+
+// ─── errors.js ───────────────────────────────────────────────────────────────
+
+const ERROR_NAMES = {
+  0: 'Ok', 1: 'Timeout', 2: 'Cancelled',
+  3: 'Unexpected', 4: 'Overflow', 5: 'SyncError', 255: 'End',
+};
+
+class ArduinoError extends Error {
+  constructor(codeOrMessage) {
+    super(typeof codeOrMessage === 'number'
+      ? (ERROR_NAMES[codeOrMessage] ?? `ErrorCode(${codeOrMessage})`)
+      : codeOrMessage);
+    this.name = 'ArduinoError';
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(msg = 'Timed out') { super(msg); this.name = 'TimeoutError'; }
+}
+
+// ─── byte-stream.js ──────────────────────────────────────────────────────────
+
+/**
+ * Wraps a Web Serial port with an async byte-at-a-time read interface.
+ * Bytes are pumped from port.readable into an internal queue.
+ */
+class ByteStream {
+  /** @param {SerialPort} port */
+  constructor(port) {
+    this._queue = [];
+    this._waiters = []; // {resolve, reject, timer}
+    this._closed = false;
+    this._reader = port.readable.getReader();
+    this._writer = port.writable.getWriter();
+    this._readLoop();
+  }
+
+  async _readLoop() {
+    try {
+      while (true) {
+        const { value, done } = await this._reader.read();
+        if (done) break;
+        for (const byte of value) this._dispatch(byte);
+      }
+    } catch {
+      // port closed
+    } finally {
+      this._closed = true;
+      const err = new Error('Serial port closed');
+      for (const w of this._waiters) {
+        clearTimeout(w.timer);
+        w.reject(err);
+      }
+      this._waiters = [];
+    }
+  }
+
+  _dispatch(byte) {
+    if (this._waiters.length > 0) {
+      const w = this._waiters.shift();
+      clearTimeout(w.timer);
+      w.resolve(byte);
+    } else {
+      this._queue.push(byte);
+    }
+  }
+
+  /**
+   * Read one byte. timeoutMs optional, signal optional.
+   * Throws TimeoutError on timeout, DOMException on abort.
+   * @param {number|AbortSignal} [timeoutOrSignal]
+   * @param {AbortSignal} [signal]
+   * @returns {Promise<number>}
+   */
+  readByte(timeoutOrSignal, signal) {
+    let timeoutMs, sig;
+    if (typeof timeoutOrSignal === 'number') { timeoutMs = timeoutOrSignal; sig = signal; }
+    else { sig = timeoutOrSignal; }
+
+    if (this._queue.length > 0) return Promise.resolve(this._queue.shift());
+    if (this._closed) return Promise.reject(new Error('Serial port closed'));
+
+    return new Promise((resolve, reject) => {
+      if (sig?.aborted) { reject(sig.reason ?? new DOMException('Aborted', 'AbortError')); return; }
+
+      const entry = { resolve, reject, timer: undefined };
+      this._waiters.push(entry);
+
+      if (timeoutMs !== undefined) {
+        entry.timer = setTimeout(() => {
+          const i = this._waiters.indexOf(entry);
+          if (i >= 0) this._waiters.splice(i, 1);
+          reject(new TimeoutError());
+        }, timeoutMs);
+      }
+
+      if (sig) {
+        const onAbort = () => {
+          clearTimeout(entry.timer);
+          const i = this._waiters.indexOf(entry);
+          if (i >= 0) this._waiters.splice(i, 1);
+          reject(sig.reason ?? new DOMException('Aborted', 'AbortError'));
+        };
+        sig.addEventListener('abort', onAbort, { once: true });
+      }
+    });
+  }
+
+  /** Read byte, return null on timeout instead of throwing. */
+  async tryReadByte(timeoutMs, signal) {
+    try { return await this.readByte(timeoutMs, signal); }
+    catch (e) { if (e instanceof TimeoutError) return null; throw e; }
+  }
+
+  /**
+   * Put a byte back. If a reader is already waiting, give it directly;
+   * otherwise prepend to the queue so it's the next byte returned.
+   */
+  unreadByte(byte) {
+    if (this._waiters.length > 0) {
+      const w = this._waiters.shift();
+      clearTimeout(w.timer);
+      w.resolve(byte);
+    } else {
+      this._queue.unshift(byte);
+    }
+  }
+
+  writeByte(value) {
+    this._writer.write(new Uint8Array([value & 0xFF]));
+  }
+
+  writeWord(value) {
+    this._writer.write(new Uint8Array([value & 0xFF, (value >> 8) & 0xFF]));
+  }
+
+  clearBuffer() {
+    this._queue = [];
+  }
+
+  async close() {
+    try { await this._reader.cancel(); } catch {}
+    try { this._writer.releaseLock(); } catch {}
+  }
+}
+
+// ─── ce140f.js ───────────────────────────────────────────────────────────────
+
+const MAX_HANDLES = 6;
+
+/** Build a framed response: [0x00, ...data, checksum] */
+function toFrame(data) {
+  const arr = [0, ...data];
+  const cs = arr.reduce((s, b) => (s + b) & 0xFF, 0);
+  arr.push(cs);
+  return new Uint8Array(arr);
+}
+
+/** Simple 1-byte result: 0x00=ok, 0xFF=error */
+function result(ok) { return new Uint8Array([ok ? 0 : 0xFF]); }
+
+/** 3-byte little-endian size */
+function sizeBytes(n) { return [n & 0xFF, (n >> 8) & 0xFF, (n >> 16) & 0xFF]; }
+
+/** ASCII string to byte array */
+function strBytes(s) { return Array.from(s).map(c => c.charCodeAt(0)); }
+
+/** Read ASCII string from Uint8Array at offset, length */
+function readStr(data, offset, len) {
+  let s = '';
+  for (let i = 0; i < len; i++) s += String.fromCharCode(data[offset + i]);
+  return s.replace(/ /g, '');
+}
+
+/** Format filename as "X:NAME    .EXT " (Sharp 8.3 format) */
+function formatFileName(name) {
+  const dot = name.lastIndexOf('.');
+  let base = dot >= 0 ? name.slice(0, dot) : name;
+  let ext  = dot >= 0 ? name.slice(dot + 1) : '';
+  base = (base.length > 8 ? base.slice(0, 8) : base.padEnd(8, ' '));
+  ext  = (ext.length  > 3 ? ext.slice(0, 3)  : ext.padEnd(3, ' '));
+  return `X:${base}.${ext} `;
+}
+
+class CE140F {
+  constructor(log) {
+    this._log = log;
+    this._dir = null;
+    this._files = [];
+    this._fileIdx = 0;
+    this._readBuf = null;
+    this._readPos = 0;
+    this._writeName = null;
+    this._writeBuf = [];
+    this._writeSize = 0;
+    this._nextCmd = 'none';
+    this._handles = Array(MAX_HANDLES).fill(null);
+    this._printHandle = null;
+  }
+
+  setDirectory(handle) { this._dir = handle; }
+
+  reset() {
+    this._files = [];
+    this._fileIdx = 0;
+    this._readBuf = null;
+    this._readPos = 0;
+    this._writeName = null;
+    this._writeBuf = [];
+    this._writeSize = 0;
+    this._nextCmd = 'none';
+    this._handles = Array(MAX_HANDLES).fill(null);
+    this._printHandle = null;
+  }
+
+  async processCommand(data) {
+    const responseData = await this._dispatch(data);
+    return { data: responseData, capture: this._nextCmd !== 'none' };
+  }
+
+  async _dispatch(data) {
+    if (this._nextCmd !== 'none') {
+      const cmd = this._nextCmd;
+      this._nextCmd = 'none';
+      if (cmd === 'textSave')   return this._saveWriteLine(data);
+      if (cmd === 'binarySave') return this._saveWriteBinary(data);
+      if (cmd === 'print')      return this._printWrite(data);
+    }
+
+    this._log.debugWrite(`Disk #${data[0].toString(16).padStart(2,'0')} `);
+
+    switch (data[0]) {
+      case 0x05: return await this._filesInit();
+      case 0x06: return this._filesItem(false);
+      case 0x07: return this._filesItem(true);
+      case 0x0E: return await this._loadOpen(data);
+      case 0x17: return this._loadReadByte();
+      case 0x12: return this._loadReadLine();
+      case 0x0F: return this._loadBinary();
+      case 0x1D: return this._diskFree(data);
+      case 0x10: return await this._saveOpen(data);
+      case 0x11: return this._saveBinary(data);
+      case 0x16: return this._saveText();
+      case 0x03: return await this._open(data);
+      case 0x04: return await this._close(data);
+      case 0x0A: return this._kill(data);
+      case 0x13: case 0x14: case 0x20: return this._input(data);
+      case 0x15: return this._print(data);
+      default:
+        this._log.writeLine(`Unknown disk command 0x${data[0].toString(16)}`);
+        return new Uint8Array([0xFF, 0]);
+    }
+  }
+
+  async _filesInit() {
+    this._log.writeLine('FILES');
+    this._fileIdx = 0;
+    this._files = [];
+    if (this._dir) {
+      for await (const [name, entry] of this._dir.entries()) {
+        if (entry.kind === 'file') this._files.push(name);
+      }
+    }
+    return toFrame([this._files.length]);
+  }
+
+  _filesItem(previous) {
+    this._log.writeLine('FILES ' + (previous ? '<Prev>' : '<Next>'));
+    if (this._files.length === 0) return new Uint8Array([0xFF, 0]);
+    const name = formatFileName(this._files[this._fileIdx]);
+    const r = strBytes(name);
+    this._fileIdx += previous ? -1 : 1;
+    this._fileIdx = Math.max(0, Math.min(this._files.length - 1, this._fileIdx));
+    return toFrame(r);
+  }
+
+  async _loadOpen(data) {
+    const name = readStr(data, 3, 12);
+    this._log.writeLine(`LOAD "${name}"`);
+    const r = [...strBytes(' ')];
+    if (!this._dir) {
+      this._log.writeLine('No disk directory selected.');
+      r.push(...sizeBytes(0));
+      return toFrame(r);
+    }
+    try {
+      const fh = await this._dir.getFileHandle(name);
+      const file = await fh.getFile();
+      this._readBuf = new Uint8Array(await file.arrayBuffer());
+      this._readPos = 0;
+      r.push(...sizeBytes(this._readBuf.length));
+    } catch {
+      this._log.writeLine(`File not found: ${name}`);
+      r.push(...sizeBytes(0));
+    }
+    return toFrame(r);
+  }
+
+  _loadReadByte() {
+    if (!this._readBuf || this._readPos >= this._readBuf.length)
+      return new Uint8Array([0xFF, 0]);
+    return toFrame([this._readBuf[this._readPos++]]);
+  }
+
+  _loadReadLine() {
+    const line = [];
+    if (this._readBuf) {
+      while (this._readPos < this._readBuf.length) {
+        const b = this._readBuf[this._readPos++];
+        if (b === 0x0A) continue;
+        line.push(b);
+        if (b === 0x0D) break;
+      }
+    }
+    if (line.length === 0 || this._readPos >= (this._readBuf?.length ?? 0)) {
+      line.push(0x1A);
+      this._readBuf = null;
+    }
+    const framed = [0, ...line];
+    const cs = framed.reduce((s, b) => (s + b) & 0xFF, 0);
+    framed.push(cs);
+    framed.push(0);
+    return new Uint8Array(framed);
+  }
+
+  _loadBinary() {
+    this._log.debugWriteLine('Load binary');
+    const r = [0];
+    if (this._readBuf) {
+      let offset = 0;
+      while (offset < this._readBuf.length) {
+        const sz = Math.min(256, this._readBuf.length - offset);
+        const block = this._readBuf.slice(offset, offset + sz);
+        r.push(...block);
+        r.push(block.reduce((s, b) => (s + b) & 0xFF, 0));
+        offset += sz;
+      }
+    }
+    r.push(0);
+    this._readBuf = null;
+    return new Uint8Array(r);
+  }
+
+  _diskFree(data) {
+    const drive = data[1];
+    const free = 65000;
+    this._log.writeLine(`DSKF(${drive}) = ${free}`);
+    return toFrame(sizeBytes(free));
+  }
+
+  async _saveOpen(data) {
+    const name = readStr(data, 3, 12);
+    this._log.writeLine(`SAVE "${name}"`);
+    if (!this._dir) { this._log.writeLine('No disk directory selected.'); return result(false); }
+    this._writeName = name;
+    this._writeBuf = [];
+    return result(true);
+  }
+
+  _saveBinary(data) {
+    this._writeSize = data[2] + (data[3] << 8) + (data[4] << 16);
+    this._log.debugWriteLine(`Save binary (size ${this._writeSize})`);
+    this._nextCmd = 'binarySave';
+    return result(true);
+  }
+
+  _saveText() {
+    this._log.debugWriteLine('Save text');
+    this._nextCmd = 'textSave';
+    return result(true);
+  }
+
+  async _saveWriteLine(data) {
+    if (!this._writeName) return result(false);
+    if (data[0] === 0x1A) {
+      await this._flushWriteFile(this._writeName, this._writeBuf);
+      this._writeName = null;
+      this._writeBuf = [];
+      return result(true);
+    }
+    for (let i = 0; i < data.length - 1; i++) this._writeBuf.push(data[i]);
+    this._nextCmd = 'textSave';
+    return result(true);
+  }
+
+  async _saveWriteBinary(data) {
+    if (!this._writeName) return result(false);
+    for (let i = 0; i < data.length - 1; i++) this._writeBuf.push(data[i]);
+    if (this._writeBuf.length >= this._writeSize) {
+      await this._flushWriteFile(this._writeName, this._writeBuf);
+      this._writeName = null;
+      this._writeBuf = [];
+    } else {
+      this._nextCmd = 'binarySave';
+    }
+    return result(true);
+  }
+
+  async _flushWriteFile(name, buf) {
+    if (!this._dir) return;
+    try {
+      const fh = await this._dir.getFileHandle(name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(new Uint8Array(buf));
+      await w.close();
+      this._log.writeLine('Done.');
+    } catch (e) {
+      this._log.writeLine(`Write error: ${e.message}`);
+    }
+  }
+
+  async _open(data) {
+    if (!this._dir) { this._log.writeLine('No disk directory selected.'); return result(false); }
+    const name = readStr(data, 3, 12);
+    const mode = data[15];
+    const fnum = data[16];
+    const idx  = fnum - 2;
+    const modeStr = ['','INPUT','OUTPUT','APPEND'][mode] ?? '?';
+    this._log.writeLine(`OPEN "${name}" FOR ${modeStr} AS #${fnum}`);
+    if (idx < 0 || idx >= MAX_HANDLES) return result(false);
+    if (this._handles[idx]) this._handles[idx] = null;
+    try {
+      let readBuf = null, writeBuf = [];
+      if (mode === 1) {
+        const fh = await this._dir.getFileHandle(name);
+        const file = await fh.getFile();
+        readBuf = new Uint8Array(await file.arrayBuffer());
+      } else if (mode === 3) {
+        try {
+          const fh = await this._dir.getFileHandle(name);
+          const file = await fh.getFile();
+          writeBuf = Array.from(new Uint8Array(await file.arrayBuffer()));
+        } catch {}
+      }
+      this._handles[idx] = { name, mode, readBuf, readPos: 0, writeBuf };
+    } catch (e) {
+      this._log.writeLine(`Open error: ${e.message}`);
+      return result(false);
+    }
+    return result(true);
+  }
+
+  async _close(data) {
+    const fnum = data[1];
+    if (fnum === 0xFF) {
+      this._log.writeLine('CLOSE <All>');
+      for (let i = 0; i < MAX_HANDLES; i++) {
+        if (this._handles[i]) await this._flushHandle(i);
+        this._handles[i] = null;
+      }
+    } else {
+      this._log.writeLine(`CLOSE #${fnum}`);
+      const idx = fnum - 2;
+      if (idx >= 0 && idx < MAX_HANDLES) {
+        await this._flushHandle(idx);
+        this._handles[idx] = null;
+      }
+    }
+    return result(true);
+  }
+
+  async _flushHandle(idx) {
+    const h = this._handles[idx];
+    if (!h || h.mode === 1 || !this._dir) return;
+    await this._flushWriteFile(h.name, h.writeBuf);
+  }
+
+  _input(data) {
+    const fnum = data[1];
+    const idx  = fnum - 2;
+    this._log.writeLine(`INPUT #${fnum}`);
+    if (idx < 0 || idx >= MAX_HANDLES || !this._handles[idx]) return result(false);
+    const h = this._handles[idx];
+    if (!h.readBuf) return result(false);
+    const line = [];
+    while (h.readPos < h.readBuf.length) {
+      const b = h.readBuf[h.readPos++];
+      line.push(b);
+      if (b === 0x0A) break;
+    }
+    line.push(0);
+    const framed = [0, ...line];
+    const cs = framed.reduce((s, b) => (s + b) & 0xFF, 0);
+    framed.push(cs);
+    framed.push(0);
+    return new Uint8Array(framed);
+  }
+
+  _print(data) {
+    const fnum = data[1];
+    const idx  = fnum - 2;
+    this._log.writeLine(`PRINT #${fnum}`);
+    if (idx < 0 || idx >= MAX_HANDLES || !this._handles[idx]) return result(false);
+    const h = this._handles[idx];
+    if (h.mode === 1) return result(false);
+    this._printHandle = h;
+    this._nextCmd = 'print';
+    return result(true);
+  }
+
+  _printWrite(data) {
+    if (!this._printHandle) return result(false);
+    if (data[0] === 0x0D && data[1] === 0x0A) return result(true);
+    for (let i = 0; i < data.length - 2; i++) this._printHandle.writeBuf.push(data[i]);
+    if (data[data.length - 3] !== 0x0A) {
+      this._printHandle.writeBuf.push(0x0D, 0x0A);
+    }
+    return result(true);
+  }
+
+  _kill(data) {
+    const name = readStr(data, 3, 12);
+    this._log.writeLine(`KILL "${name}" (not implemented)`);
+    return result(false);
+  }
+}
+
+// ─── arduino.js ──────────────────────────────────────────────────────────────
+
+const Command = { Init:1, Ping:2, DeviceSelect:3, Print:4, Data:5, LoadTape:6, SaveTape:7, Disk:8 };
+
+const BUFFER_SIZE  = 64;
+const HEADER_SIZE  = 10;
+const VERSION_HIGH = 1;
+const VERSION_LOW  = 3;
+const READ_TIMEOUT = 5000;
+
+function swapNibbles(b) { return ((b & 0x0F) << 4) | ((b & 0xF0) >> 4); }
+
+class Arduino {
+  constructor(log) {
+    this._log = log;
+    this._disk = new CE140F(log);
+    this._stream = null;
+    this._port = null;
+    this._loopAbort = null;
+    this._loopDone = null;
+    this._opAbort = null;
+    this._cmdActive = false;
+    this.isConnected = false;
+    this.onStateChange = null;
+  }
+
+  setDiskDirectory(handle) { this._disk.setDirectory(handle); }
+
+  async connect() {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+    try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch {}
+    this._port = port;
+    this._stream = new ByteStream(port);
+    this.isConnected = true;
+    this.onStateChange?.();
+    this._log.writeLine('Connected.');
+
+    try { await this._initialize(); }
+    catch (e) { await this.disconnect(); throw e; }
+
+    this._startLoop();
+  }
+
+  async disconnect() {
+    if (!this.isConnected) return;
+    this._stopLoop();
+    this._opAbort?.abort();
+    try { this._stream?.writeByte(Ascii.CAN); } catch {}
+    this._disk.reset();
+    await this._stream?.close();
+    this._stream = null;
+    try { await this._port?.close(); } catch {}
+    this._port = null;
+    this.isConnected = false;
+    this.onStateChange?.();
+    this._log.writeLine('Disconnected.');
+  }
+
+  cancel() {
+    this._stream?.writeByte(Ascii.CAN);
+    this._opAbort?.abort();
+    this._opAbort = null;
+    this.onStateChange?.();
+  }
+
+  get canCancel() { return !!this._opAbort; }
+
+  _startLoop() {
+    this._loopAbort = new AbortController();
+    this._loopDone = this._loopSupervisor(this._loopAbort.signal);
+    this._loopDone.catch(() => {});
+  }
+
+  _stopLoop() {
+    this._loopAbort?.abort();
+    this._loopAbort = null;
+  }
+
+  async _loopSupervisor(signal) {
+    let failures = 0;
+    while (!signal.aborted && this._stream) {
+      try {
+        await this._mainLoop(signal);
+        failures = 0;
+      } catch (e) {
+        if (signal.aborted || e?.name === 'AbortError') return;
+        failures++;
+        this._log.writeLine(`Loop error: ${e.message}`);
+        const ms = failures <= 3 ? 100 : failures <= 10 ? 500 : 1000;
+        await new Promise(r => setTimeout(r, ms));
+      }
+    }
+    if (this.isConnected && !signal.aborted) this.disconnect().catch(() => {});
+  }
+
+  async _mainLoop(signal) {
+    while (!signal.aborted && this._stream) {
+      const byte = await this._stream.readByte(signal);
+
+      if (this._cmdActive) {
+        this._stream.unreadByte(byte);
+        await new Promise(r => { this._resumeLoop = r; });
+        continue;
+      }
+
+      if (byte === Ascii.SYN) {
+        this._stream.writeByte(Ascii.SYN);
+      } else if (byte === Ascii.SOH) {
+        await this._processIncoming(signal);
+      }
+    }
+  }
+
+  async _withCommand(fn) {
+    if (!this._stream) throw new ArduinoError('Not connected');
+    this._cmdActive = true;
+    try {
+      this._stream.writeByte(Ascii.CAN);
+      await new Promise(r => setTimeout(r, 100));
+      if (!this._stream) throw new ArduinoError('Disconnected during command setup');
+      this._stream.clearBuffer();
+      return await fn();
+    } finally {
+      this._cmdActive = false;
+      this._resumeLoop?.();
+      this._resumeLoop = null;
+      this.onStateChange?.();
+    }
+  }
+
+  async _processIncoming(signal) {
+    const cmd = await this._stream.tryReadByte(1000, signal);
+    if (cmd === null) return;
+
+    switch (cmd) {
+      case Command.Ping:
+        this._stream.writeByte(Ascii.ACK);
+        break;
+
+      case Command.Init: {
+        const vh = await this._stream.tryReadByte(500, signal);
+        const vl = await this._stream.tryReadByte(500, signal);
+        const bs = await this._stream.tryReadByte(500, signal);
+        let b = await this._stream.tryReadByte(500, signal);
+        if (b === Ascii.STX) {
+          while (true) {
+            b = await this._stream.tryReadByte(500, signal);
+            if (b === null || b === Ascii.ETX) break;
+          }
+        }
+        this._log.debugWriteLine(`Drained stale init response v${vh}.${vl} buf=${bs}`);
+        break;
+      }
+
+      case Command.DeviceSelect: {
+        const dev = await this._stream.tryReadByte(1000, signal);
+        if (dev !== null) this._log.debugWriteLine(`Device Select: 0x${dev.toString(16)}`);
+        break;
+      }
+
+      case Command.Print: {
+        const ch = await this._stream.tryReadByte(1000, signal);
+        if (ch !== null) {
+          if (ch === 13) this._log.writeLine();
+          else this._log.write(String.fromCharCode(ch));
+        }
+        break;
+      }
+
+      case Command.Data: {
+        const val = await this._stream.tryReadByte(1000, signal);
+        if (val !== null) this._log.writeLine(`Data: 0x${val.toString(16).padStart(2,'0')}`);
+        break;
+      }
+
+      case Command.Disk: {
+        this._log.debugWriteLine('Disk command:');
+        const cmdData = await this._readFrame(signal);
+        const response = await this._disk.processCommand(cmdData);
+        await this._sendDiskResponse(response, signal);
+        break;
+      }
+    }
+  }
+
+  async _initialize() {
+    // Wait for _readLoop to pump any bytes already in the hardware RX buffer
+    // before we clear them (DTR-low still triggers a brief reset on some Arduinos).
+    await new Promise(r => setTimeout(r, 200));
+    // Drain any bytes the Arduino sent during reset (mirrors C# ClearReceiveBuffer)
+    this._stream.clearBuffer();
+
+    if (!await this._synchronize()) throw new ArduinoError('Synchronization failed');
+
+    // Drain again — Arduino may have echoed extra SYNs or sent startup text
+    this._stream.clearBuffer();
+
+    this._stream.writeByte(Ascii.SOH);
+    this._stream.writeByte(Command.Init);
+
+    await this._expectByte(Ascii.SOH, 2500);
+    const vh = await this._stream.readByte(1000);
+    const vl = await this._stream.readByte(1000);
+    if (vh !== VERSION_HIGH || vl !== VERSION_LOW)
+      throw new ArduinoError(
+        `Firmware version mismatch: expected ${VERSION_HIGH}.${VERSION_LOW}, got ${vh}.${vl}.\n` +
+        `Please flash the latest Arduino firmware using the desktop app.`
+      );
+    const bufSize = await this._stream.readByte(1000);
+    if (bufSize < 16) throw new ArduinoError(`Buffer size ${bufSize} too small`);
+
+    await this._expectByte(Ascii.STX, 1000);
+    while (true) {
+      const b = await this._stream.readByte(1000);
+      if (b === Ascii.ETX) break;
+      this._log.write(String.fromCharCode(b));
+    }
+    this._log.writeLine();
+  }
+
+  async ping() {
+    return this._withCommand(async () => {
+      this._log.debugWriteLine('Synchronizing...');
+      if (!await this._synchronize()) { this._log.writeLine('Sync failed.'); return; }
+      this._log.write('Pinging... ');
+      this._stream.writeByte(Ascii.SOH);
+      this._stream.writeByte(Command.Ping);
+      const r = await this._stream.tryReadByte(2500);
+      if (r === Ascii.ACK) { this._log.writeLine('OK.'); }
+      else if (r === Ascii.NAK) {
+        const code = await this._stream.tryReadByte(2000);
+        this._log.writeLine(`Failure: ${code ?? 'timeout'}`);
+      } else { this._log.writeLine('No response.'); }
+    });
+  }
+
+  async sendTapeFile(fileData) {
+    return this._withCommand(async () => {
+      const data = this._processTapeFile(new Uint8Array(fileData));
+      if (!await this._synchronize()) throw new ArduinoError('Sync failed');
+      this._log.writeLine(`Sending tape file; length: ${fileData.length}`);
+      this._stream.writeByte(Ascii.SOH);
+      this._stream.writeByte(Command.LoadTape);
+      this._stream.writeWord(fileData.length);
+      this._stream.writeByte(HEADER_SIZE);
+      await this._readResponse();
+      await this._sendBuffer(data);
+      this._log.writeLine('Done.');
+    });
+  }
+
+  async readTapeFile() {
+    return this._withCommand(async () => {
+      if (!await this._synchronize()) throw new ArduinoError('Sync failed');
+      this._log.writeLine('Waiting for CSAVE on pocket computer...');
+      this._stream.writeByte(Ascii.SOH);
+      this._stream.writeByte(Command.SaveTape);
+      await this._readResponse();
+
+      this._opAbort = new AbortController();
+      this.onStateChange?.();
+      try {
+        const raw = await this._readFrame(this._opAbort.signal);
+        return this._processTapeFile(raw);
+      } finally {
+        this._opAbort = null;
+        this.onStateChange?.();
+      }
+    });
+  }
+
+  _processTapeFile(data) {
+    if (data.length < 8) return data;
+    const out = new Uint8Array(data);
+    const fmt = out[0];
+    for (let i = 1; i <= 7; i++) out[i] = swapNibbles(out[i]);
+    if ((fmt === 0x71 || fmt === 0x73) && data.length >= 18) {
+      for (let i = 10; i <= 17; i++) out[i] = swapNibbles(out[i]);
+    }
+    return out;
+  }
+
+  async _synchronize() {
+    for (let i = 0; i < 10; i++) {
+      this._stream.writeByte(Ascii.SYN);
+      const r = await this._stream.tryReadByte(1000);
+      if (r === Ascii.SYN) {
+        while (true) {
+          const extra = await this._stream.tryReadByte(80);
+          if (extra === null) break;
+          if (extra !== Ascii.SYN) { this._stream.unreadByte(extra); break; }
+        }
+        return true;
+      }
+      if (r === Ascii.NAK) await this._stream.tryReadByte(1000);
+    }
+    return false;
+  }
+
+  async _readResponse(timeoutMs = READ_TIMEOUT, signal) {
+    const r = await this._stream.readByte(timeoutMs, signal);
+    if (r === Ascii.ACK) return;
+    if (r === Ascii.NAK) throw new ArduinoError(await this._stream.readByte(1000, signal));
+    throw new ArduinoError(`Unexpected response: 0x${r.toString(16)}`);
+  }
+
+  async _readFrame(signal) {
+    const start = await this._stream.readByte(signal);
+    if (start === Ascii.NAK) throw new ArduinoError(await this._stream.readByte(2000, signal));
+    if (start !== Ascii.STX) throw new ArduinoError(`Expected STX, got 0x${start.toString(16)}`);
+
+    const buf = [];
+    while (true) {
+      let b = await this._stream.readByte(1000, signal);
+      if (b === Ascii.DLE) {
+        b = await this._stream.readByte(1000, signal);
+      } else if (b === Ascii.NAK) {
+        throw new ArduinoError(await this._stream.readByte(1000, signal));
+      } else if (b === Ascii.CAN) {
+        throw new ArduinoError(2);
+      } else if (b === Ascii.ETX) {
+        if (buf.length % 40 !== 0) this._log.writeLine();
+        return new Uint8Array(buf);
+      }
+      buf.push(b);
+      this._log.write('.');
+      if (buf.length % 80 === 0) this._log.writeLine();
+    }
+  }
+
+  async _sendBuffer(data, signal) {
+    let offset = 0;
+    while (offset < data.length) {
+      const size = Math.min(BUFFER_SIZE, data.length - offset);
+      for (let i = 0; i < size; i++) this._stream.writeByte(data[offset++]);
+      await this._readResponse(READ_TIMEOUT, signal);
+    }
+  }
+
+  async _sendDiskResponse(response, signal) {
+    this._stream.writeByte(Ascii.SOH);
+    this._stream.writeByte(Command.Disk);
+    this._stream.writeByte(response.capture ? 0xFF : 0);
+    this._stream.writeWord(response.data.length);
+    await this._readResponse(READ_TIMEOUT, signal);
+    await this._sendBuffer(response.data, signal);
+  }
+
+  async _expectByte(expected, timeoutMs) {
+    const b = await this._stream.readByte(timeoutMs);
+    if (b !== expected) throw new ArduinoError(`Expected 0x${expected.toString(16)}, got 0x${b.toString(16)}`);
+  }
+}
+
+// ─── main.js ─────────────────────────────────────────────────────────────────
+
+const btnConnect    = document.getElementById('btn-connect');
+const btnDisconnect = document.getElementById('btn-disconnect');
+const btnPing       = document.getElementById('btn-ping');
+const btnSendTape   = document.getElementById('btn-send-tape');
+const btnRecvTape   = document.getElementById('btn-recv-tape');
+const btnDiskDir    = document.getElementById('btn-disk-dir');
+const btnCancel     = document.getElementById('btn-cancel');
+const chkDebug      = document.getElementById('chk-debug');
+const lblDiskDir    = document.getElementById('lbl-disk-dir');
+const logEl         = document.getElementById('log');
+const statusEl      = document.getElementById('status');
+
+let debugEnabled = false;
+let arduino = null;
+
+const log = {
+  write(text) { appendLog(text, false); },
+  writeLine(text = '') { appendLog(text + '\n', false); },
+  debugWrite(text) { if (debugEnabled) appendLog(text, true); },
+  debugWriteLine(text) { if (debugEnabled) appendLog(text + '\n', true); },
+};
+
+function appendLog(text, isDebug) {
+  const span = document.createElement('span');
+  span.textContent = text;
+  if (isDebug) span.className = 'debug';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function updateUI() {
+  const connected = arduino?.isConnected ?? false;
+  btnConnect.disabled    = connected;
+  btnDisconnect.disabled = !connected;
+  btnPing.disabled       = !connected;
+  btnSendTape.disabled   = !connected;
+  btnRecvTape.disabled   = !connected;
+  btnDiskDir.disabled    = !connected;
+  btnCancel.disabled     = !(arduino?.canCancel ?? false);
+  statusEl.textContent   = connected ? 'Connected' : 'Disconnected';
+  statusEl.className     = connected ? 'connected' : 'disconnected';
+}
+
+btnConnect.addEventListener('click', async () => {
+  try {
+    arduino = new Arduino(log);
+    arduino.onStateChange = updateUI;
+    updateUI();
+    await arduino.connect();
+  } catch (e) {
+    const msg = e?.message ?? String(e);
+    if (e?.name === 'NotFoundError' || msg.includes('No port selected') || e?.name === 'AbortError') {
+      // silent
+    } else if (msg.toLowerCase().includes('permission') || msg.includes('128')) {
+      log.writeLine('Connection failed: OS permission denied.');
+      log.writeLine('  On Arch Linux:  sudo usermod -a -G uucp $USER  (then log out/in)');
+      log.writeLine('  On Ubuntu/Debian: sudo usermod -a -G dialout $USER');
+      log.writeLine('  Temporary:  sudo chmod a+rw /dev/ttyACM0  (or /dev/ttyUSB0)');
+    } else {
+      log.writeLine(`Connect error: ${msg}`);
+    }
+    arduino = null;
+    updateUI();
+  }
+});
+
+btnDisconnect.addEventListener('click', async () => {
+  try { await arduino?.disconnect(); }
+  catch (e) { log.writeLine(`Disconnect error: ${e.message}`); }
+  arduino = null;
+  updateUI();
+});
+
+btnPing.addEventListener('click', async () => {
+  try { await arduino?.ping(); }
+  catch (e) { log.writeLine(`Ping error: ${e.message}`); }
+});
+
+btnSendTape.addEventListener('click', async () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.tap,.bin';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      await arduino?.sendTapeFile(data);
+    } catch (e) {
+      log.writeLine(`Send error: ${e.message}`);
+    }
+    updateUI();
+  };
+  input.click();
+});
+
+btnRecvTape.addEventListener('click', async () => {
+  try {
+    updateUI();
+    const data = await arduino?.readTapeFile();
+    if (!data) return;
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'tape.tap';
+    a.click();
+    URL.revokeObjectURL(url);
+    log.writeLine(`Saved ${data.length} bytes as tape.tap`);
+  } catch (e) {
+    log.writeLine(`Receive error: ${e.message}`);
+  }
+  updateUI();
+});
+
+btnDiskDir.addEventListener('click', async () => {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    log.writeLine('Directory picker requires a secure context (https:// or localhost).');
+    log.writeLine('  Start a local server:  python3 -m http.server  →  http://localhost:8000');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    arduino?.setDiskDirectory(handle);
+    lblDiskDir.textContent = handle.name;
+    log.writeLine(`Disk directory: ${handle.name}`);
+  } catch (e) {
+    if (e?.name !== 'AbortError') log.writeLine(`Directory error: ${e.message}`);
+  }
+});
+
+btnCancel.addEventListener('click', () => { arduino?.cancel(); updateUI(); });
+
+chkDebug.addEventListener('change', () => { debugEnabled = chkDebug.checked; });
+
+document.getElementById('btn-clear-log').addEventListener('click', () => {
+  logEl.textContent = '';
+});
+
+if (!('serial' in navigator)) {
+  logEl.textContent = 'Web Serial API is not supported in this browser.\nUse Chrome or Edge 89+.';
+  btnConnect.disabled = true;
+}
+
+updateUI();
+</script>
+</body>
+</html>
